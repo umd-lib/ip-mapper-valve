@@ -12,10 +12,13 @@ import javax.servlet.ServletException;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.util.SubnetUtils;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.MessageBytes;
+
+import com.google.common.net.InetAddresses;
 
 /**
  * This valve checks a user's IP address against a properties file containing
@@ -23,7 +26,9 @@ import org.apache.tomcat.util.buf.MessageBytes;
  * blocks, the valve inserts a header, which can then be read by other
  * applications to determine access rights.
  *
- * The properties file should be [insert format requirements here]
+ * The properties file should follow the following format:
+ *
+ * propertyName1=propertyValue1 propertyName2=propertyValue2
  *
  * The valve expects the following configuration format and options:
  *
@@ -31,6 +36,8 @@ import org.apache.tomcat.util.buf.MessageBytes;
  * mappingFile="path/to/mapping.properties" headerName="Some-Header" /&gt;
  *
  * Note the following parameters: mappingFile and headerName.
+ *
+ * @author jgottwig
  */
 
 public class IPAddressMapper extends ValveBase {
@@ -151,6 +158,16 @@ public class IPAddressMapper extends ValveBase {
     }
 
     /**
+     * Validate the IP address before continuing.
+     *
+     * @TODO Test
+     */
+    if (!InetAddresses.isInetAddress(userIP)) {
+      log.warn("IP: " + userIP + " detected as invalid!");
+      getNext().invoke(request, response);
+    }
+
+    /**
      * Compare user IP to properties blocks.
      *
      * @TODO Find a good IP comparison library *done*
@@ -186,13 +203,13 @@ public class IPAddressMapper extends ValveBase {
      * @TODO Write header injection
      * @TODO Test
      */
+    String finalHeaders = null;
     if (!approvals.isEmpty()) {
-      // MessageBytes newHeader =
-      // request.getCoyoteRequest().getMimeHeaders().addValue(this.headerName);
-      // newHeader.setString(value);
+      finalHeaders = StringUtils.join(approvals, ",");
+      MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().addValue(this.headerName);
+      newHeader.setString(finalHeaders);
     }
 
     getNext().invoke(request, response);
   }
-
 }
