@@ -43,7 +43,7 @@ public class IPAddressMapper extends ValveBase {
    * properties file
    *
    * @param mappingFile
-   * @note Could headers be comma-separated based on the properites keys?
+   * @note Could auth headers be comma-separated based on the properites keys?
    */
   public void setMappingFile(String mappingFile) {
     this.mappingFile = mappingFile;
@@ -73,6 +73,8 @@ public class IPAddressMapper extends ValveBase {
 
     /**
      * Attempt to load our properties file
+     *
+     * @TODO Test
      */
     Properties properties = new Properties();
     InputStream input = null;
@@ -80,9 +82,11 @@ public class IPAddressMapper extends ValveBase {
     try {
       input = new FileInputStream(this.mappingFile);
       properties.load(input);
-
     } catch (IOException e) {
       e.printStackTrace();
+      log.error(e);
+      // No reason to go beyond this point.
+      getNext().invoke(request, response);
     } finally {
       if (input != null) {
         try {
@@ -111,6 +115,7 @@ public class IPAddressMapper extends ValveBase {
      * Get user IP. For now, we are assuming only IPV4.
      *
      * @TODO Get user IP
+     * @TODO Test
      * @note Is proxy support needed?
      */
     String rawIP = request.getHeader("X-FORWARDED-FOR");
@@ -125,7 +130,7 @@ public class IPAddressMapper extends ValveBase {
        */
       String[] userIPs = rawIP.split(",");
       if (userIPs[0] != null) {
-        userIP = userIPs[0];
+        userIP = userIPs[0].trim();
       }
     }
 
@@ -133,14 +138,19 @@ public class IPAddressMapper extends ValveBase {
      * Compare user IP to properties blocks.
      *
      * @TODO Find a good IP comparison library *done*
-     * @TODO Write comparison logic. It must support CIDR
-     * @TODO Loop through properties data
+     * @TODO Write comparison logic. It must support CIDR *done*
+     * @TODO Loop through properties data *done*
+     * @TODO Test
      */
     Enumeration<?> propertyNames = properties.propertyNames();
 
     ArrayList<String> approvals = new ArrayList<String>();
-    SubnetUtils utils;
+    SubnetUtils utils; // Our comparison library
 
+    /**
+     * Loop through properties. Check each IP block and compare with the user's
+     * IP. If a match, add to our approvals ArrayList.
+     */
     while (propertyNames.hasMoreElements()) {
       String key = (String) propertyNames.nextElement();
       String property = properties.getProperty(key);
@@ -158,10 +168,13 @@ public class IPAddressMapper extends ValveBase {
      *
      * @TODO Determine what happens if the criteria doesn't match (nothing?)
      * @TODO Write header injection
+     * @TODO Test
      */
-    // MessageBytes newHeader =
-    // request.getCoyoteRequest().getMimeHeaders().addValue(this.headerName);
-    // newHeader.setString(value);
+    if (!approvals.isEmpty()) {
+      // MessageBytes newHeader =
+      // request.getCoyoteRequest().getMimeHeaders().addValue(this.headerName);
+      // newHeader.setString(value);
+    }
 
     getNext().invoke(request, response);
   }
