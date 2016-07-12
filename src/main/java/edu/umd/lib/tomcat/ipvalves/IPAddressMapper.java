@@ -17,6 +17,22 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.MessageBytes;
 
+/**
+ * This valve checks a user's IP address against a properties file containing
+ * one or more IP blocks. If the user's IP is found within one or more of these
+ * blocks, the valve inserts a header, which can then be read by other
+ * applications to determine access rights.
+ *
+ * The properties file should be [insert format requirements here]
+ *
+ * The valve expects the following configuration format and options:
+ *
+ * &lt;Valve className="edu.umd.lib.tomcat.valves.IPAddressMapper"
+ * mappingFile="path/to/mapping.properties" headerName="Some-Header" /&gt;
+ *
+ * Note the following parameters: mappingFile and headerName.
+ */
+
 public class IPAddressMapper extends ValveBase {
 
   protected static final String info = "edu.umd.lib.tomcat.ipvalves.IPAddressMapper/0.0.1";
@@ -53,8 +69,8 @@ public class IPAddressMapper extends ValveBase {
    * Get the header name we want to check/set for access
    *
    * @param headerName
-   * @note I'm a bit confused if this is necessary. Couldn't there be multiple
-   *       header names based on where a user fits into one or more IP blocks?
+   * @note Couldn't there be multiple header values based on where a user fits
+   *       into one or more IP blocks?
    */
   public void setHeaderName(String headerName) {
     this.headerName = headerName;
