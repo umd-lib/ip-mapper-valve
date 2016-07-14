@@ -144,6 +144,8 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    * Load the properties file
    *
    * @return boolean (success)
+   *
+   *         TODO Pre-process the properties IPs using SubnetUtils
    */
   protected boolean loadProperties() {
     boolean success = false;
@@ -166,24 +168,27 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
     return success;
   }
 
+  protected boolean loadProperties2() {
+    boolean success = false;
+    // FileBasedConfigurationBuilder<Configuration> builder = new
+    // FileBasedConfigurationBuilder<Configuration>(
+    // PropertiesConfiguration.class)
+    // .configure(properties.properties()
+    // .setFileName(mappingFile));
+    // Configuration config = builder.getConfiguration();
+    return success;
+  }
+
   @Override
   public void invoke(Request request, Response response) throws IOException, ServletException {
 
     /**
      * Attempt to load our properties file
-     *
-     * @TODO Move this into some sort of cache method?
-     * @TODO Look at lifecycle stuff
-     * @TODO Test
      */
     if (checkProperties() || loadProperties()) {
       /**
        * Check user headers for existing header. This is necessary to prevent
        * spoofing. If the header already exists, strip and reevaluate.
-       *
-       * @TODO Strip if exists *done*
-       * @TODO Log alert if exists *done*
-       * @TODO Test
        */
       MessageBytes storedHeader = request.getCoyoteRequest().getMimeHeaders().getValue(headerName);
       if (storedHeader != null) {
@@ -198,7 +203,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
        * @TODO Test
        * @note Is proxy support needed?
        */
-      // String userIP = retrieveIP(request);
       String userIP = null;
       String rawIP = request.getHeader("X-FORWARDED-FOR");
       if (rawIP == null) {
@@ -224,10 +228,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
         /**
          * Inject the header with value if the user's IP meets the above
          * criteria.
-         *
-         * @TODO Determine what happens if the criteria doesn't match (nothing?)
-         * @TODO Write header injection
-         * @TODO Test
          */
         String finalHeaders = null;
         if (!approvals.isEmpty()) {
