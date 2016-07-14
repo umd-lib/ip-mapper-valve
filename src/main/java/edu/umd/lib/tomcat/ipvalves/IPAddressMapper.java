@@ -102,37 +102,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    * @return boolean (valid IP)
    */
   protected boolean isValidIP(String ip) {
-    log.info("IPVali: init");
     return InetAddressValidator.getInstance().isValidInet4Address(ip);
-  }
-
-  /**
-   * Get user IP from the request
-   *
-   * @param request
-   * @return String (userIP)
-   */
-  protected String retrieveIP(Request request) {
-    String userIP = null;
-    String rawIP = request.getHeader("X-FORWARDED-FOR");
-    if (rawIP == null) {
-      userIP = request.getRemoteAddr();
-      log.info("IPNorm: " + userIP);
-    } else {
-      /**
-       * It's possible we might get a comma-separated list of IPs, in which
-       * case, we should split prior to evaluation. Real IP should always come
-       * first. This doesn't look pretty though.
-       */
-      log.info("IPRaw: " + rawIP);
-      String[] userIPs = rawIP.split(",");
-      if (userIPs[0] != null) {
-        userIP = userIPs[0].trim();
-        log.info("IPProx: " + userIP);
-      }
-    }
-    log.info("IPReturning: " + userIP);
-    return userIP;
   }
 
   /**
@@ -145,7 +115,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
     Enumeration<?> propertyNames = properties.propertyNames();
 
     List<String> approvals = new ArrayList<String>();
-    log.info("IPBefore");
     SubnetUtils utils; // Our comparison library
 
     /**
@@ -157,14 +126,9 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
       String property = properties.getProperty(key);
       String[] subnets = property.split(",");
       for (String subnet : subnets) {
-        log.info("IPip: " + subnet);
         utils = new SubnetUtils(subnet);
-        log.info("IPAfter: " + utils);
         if (utils.getInfo().isInRange(ip)) {
-          log.info("IPMatch");
           approvals.add(key);
-        } else {
-          log.info("IPNoMatch");
         }
       }
     }
@@ -183,15 +147,12 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    */
   protected boolean loadProperties() {
     boolean success = false;
-    log.info("IPProps: NoProps");
     InputStream input = null;
     try {
       input = new FileInputStream(mappingFile);
       properties.load(input);
-      log.info("IPAddress: " + properties.getProperty("campus"));
       success = true;
     } catch (IOException e) {
-      e.printStackTrace();
       log.error(e);
     } finally {
       if (input != null) {
@@ -208,10 +169,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
   @Override
   public void invoke(Request request, Response response) throws IOException, ServletException {
 
-    log.info(request);
-    log.info("IPMapping File: " + mappingFile);
-    log.info("IPHeader Name: " + headerName);
-
     /**
      * Attempt to load our properties file
      *
@@ -219,8 +176,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
      * @TODO Look at lifecycle stuff
      * @TODO Test
      */
-    if (checkProperties()) {
-
+    if (checkProperties() || loadProperties()) {
       /**
        * Check user headers for existing header. This is necessary to prevent
        * spoofing. If the header already exists, strip and reevaluate.
@@ -233,8 +189,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
       if (storedHeader != null) {
         log.warn("Header: " + storedHeader + " found before IP mapper eval!");
         request.getCoyoteRequest().getMimeHeaders().removeHeader(headerName);
-      } else {
-        log.info("IPHeader: Not found");
       }
 
       /**
@@ -244,12 +198,24 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
        * @TODO Test
        * @note Is proxy support needed?
        */
-      String userIP = retrieveIP(request);
-
-      log.info("IPBreak");
+      // String userIP = retrieveIP(request);
+      String userIP = null;
+      String rawIP = request.getHeader("X-FORWARDED-FOR");
+      if (rawIP == null) {
+        userIP = request.getRemoteAddr();
+      } else {
+        /**
+         * It's possible we might get a comma-separated list of IPs, in which
+         * case, we should split prior to evaluation. Real IP should always come
+         * first. This doesn't look pretty though.
+         */
+        String[] userIPs = rawIP.split(",");
+        if (userIPs[0] != null) {
+          userIP = userIPs[0].trim();
+        }
+      }
 
       if (isValidIP(userIP)) {
-        log.info("passed");
         /**
          * Compare user IP to properties IPs
          */
@@ -266,14 +232,11 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
         String finalHeaders = null;
         if (!approvals.isEmpty()) {
           finalHeaders = StringUtils.join(approvals, ",");
-          log.info("IPNew: " + finalHeaders);
-          request.getCoyoteRequest().getMimeHeaders().setValue(headerName).setString(finalHeaders);
+          MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().setValue(headerName);
+          newHeader.setString(finalHeaders);
         }
       } // @end validIP
     } // @end loadProperties
-    log.info("IPHeader: " + request.getHeader(headerName));
-    log.info("IPResponse: " + response.getHeader(headerName));
-    log.info("IPTest: " + response.getHeader("Content-Type"));
-    getNext().invoke(request, response); // Junit for testing
+    getNext().invoke(request, response);
   }
 }
