@@ -78,7 +78,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    * properties file
    *
    * @param mappingFile
-   * @note Could auth headers be comma-separated based on the properites keys?
    */
   public void setMappingFile(String mappingFile) {
     this.mappingFile = mappingFile;
@@ -88,8 +87,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    * Get the header name we want to check/set for access
    *
    * @param headerName
-   * @note Couldn't there be multiple header values based on where a user fits
-   *       into one or more IP blocks?
    */
   public void setHeaderName(String headerName) {
     this.headerName = headerName;
@@ -135,6 +132,12 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
     return approvals;
   }
 
+  /**
+   * Verify that we have something in our configuration file... Or that our
+   * properties even loaded properly.
+   *
+   * @return boolean (result of .hasMoreElements())
+   */
   protected boolean checkProperties() {
     Enumeration<?> propertyNames = properties.elements();
     return propertyNames.hasMoreElements();
