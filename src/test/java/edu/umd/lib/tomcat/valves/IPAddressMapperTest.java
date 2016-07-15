@@ -60,8 +60,23 @@ public class IPAddressMapperTest {
     request.setCoyoteRequest(new org.apache.coyote.Request());
     request.setRemoteAddr("192.168.40.1");
     mapper.invoke(request, null);
+    boolean success = false;
+    System.out.println("Test: " + request.getHeader(headerName));
+    if (request.getHeader(headerName) != null && request.getHeader(headerName).trim().equals("annex,campus")) {
+      success = true;
+    }
+    assertTrue("Header " + headerName + " expected filled", success);
+  }
+
+  @Test
+  public void testRemoteAddrStoredFalse() throws Exception {
+    Request request = new MockRequest();
+    request.setCoyoteRequest(new org.apache.coyote.Request());
+    request.getCoyoteRequest().getMimeHeaders().setValue(headerName).setString("spoof-attempt");
+    request.setRemoteAddr("208.168.40.1");
+    mapper.invoke(request, null);
     boolean exists = request.getHeader(headerName) != null;
-    assertTrue("Header " + headerName + " expected filled", exists);
+    assertFalse("Header " + headerName + " expected empty", exists);
   }
 
   @Test
@@ -70,8 +85,11 @@ public class IPAddressMapperTest {
     request.setCoyoteRequest(new org.apache.coyote.Request());
     request.getCoyoteRequest().getMimeHeaders().setValue("X-FORWARDED-FOR").setString("192.168.40.1");
     mapper.invoke(request, null);
-    boolean exists = request.getHeader(headerName) != null;
-    assertTrue("Header " + headerName + " expected filled", exists);
+    boolean success = false;
+    if (request.getHeader(headerName) != null && request.getHeader(headerName).trim().equals("annex,campus")) {
+      success = true;
+    }
+    assertTrue("Header " + headerName + " expected filled", success);
   }
 
   @Test
@@ -92,8 +110,11 @@ public class IPAddressMapperTest {
     request.getCoyoteRequest().getMimeHeaders().setValue("X-FORWARDED-FOR").setString("192.168.38.1");
     request.getCoyoteRequest().getMimeHeaders().setValue(headerName).setString("spoof-attempt");
     mapper.invoke(request, null);
-    boolean exists = request.getHeader(headerName) != null;
-    assertTrue("Header " + headerName + " expected filled", exists);
+    boolean success = false;
+    if (request.getHeader(headerName) != null && request.getHeader(headerName).trim().equals("campus,housing")) {
+      success = true;
+    }
+    assertTrue("Header " + headerName + " expected filled", success);
   }
 
   private class InvokedValve extends ValveBase {

@@ -30,7 +30,7 @@ import org.apache.tomcat.util.buf.MessageBytes;
  *
  * The properties file should follow the following format:
  *
- * propertyName1=propertyValue1
+ * header-name=0.0.0.0/32,0.0.0.0/16
  *
  * The valve expects the following configuration format and options:
  *
@@ -213,7 +213,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
         }
       }
 
-      if (isValidIP(userIP)) {
+      if (userIP != null && isValidIP(userIP)) {
         /**
          * Compare user IP to properties IPs
          */
