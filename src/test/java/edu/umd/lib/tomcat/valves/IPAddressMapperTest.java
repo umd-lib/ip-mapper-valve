@@ -1,4 +1,4 @@
-package edu.umd.lib.tomcat.ipvalves;
+package edu.umd.lib.tomcat.valves;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;

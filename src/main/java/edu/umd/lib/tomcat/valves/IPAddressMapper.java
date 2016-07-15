@@ -1,4 +1,4 @@
-package edu.umd.lib.tomcat.ipvalves;
+package edu.umd.lib.tomcat.valves;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -144,8 +144,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    * Load the properties file
    *
    * @return boolean (success)
-   *
-   *         TODO Pre-process the properties IPs using SubnetUtils
    */
   protected boolean loadProperties() {
     boolean success = false;
@@ -198,10 +196,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
 
       /**
        * Get user IP. For now, we are assuming only IPV4.
-       *
-       * @TODO Get user IP
-       * @TODO Test
-       * @note Is proxy support needed?
        */
       String userIP = null;
       String rawIP = request.getHeader("X-FORWARDED-FOR");
@@ -234,9 +228,10 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
           finalHeaders = StringUtils.join(approvals, ",");
           MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().setValue(headerName);
           newHeader.setString(finalHeaders);
+          log.info("IP Mapper added: " + finalHeaders + " to header " + headerName + " for IP " + userIP);
         }
-      } // @end validIP
-    } // @end loadProperties
+      } // @end isValidIP
+    } // @end checkProperties || loadProperties
     getNext().invoke(request, response);
   }
 }
