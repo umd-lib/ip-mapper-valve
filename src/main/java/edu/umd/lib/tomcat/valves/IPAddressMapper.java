@@ -169,72 +169,55 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
     return success;
   }
 
-  protected boolean loadProperties2() {
-    boolean success = false;
-    // FileBasedConfigurationBuilder<Configuration> builder = new
-    // FileBasedConfigurationBuilder<Configuration>(
-    // PropertiesConfiguration.class)
-    // .configure(properties.properties()
-    // .setFileName(mappingFile));
-    // Configuration config = builder.getConfiguration();
-    return success;
-  }
-
   @Override
   public void invoke(Request request, Response response) throws IOException, ServletException {
 
     /**
-     * Attempt to load our properties file
+     * Check user headers for existing header. This is necessary to prevent
+     * spoofing. If the header already exists, strip and reevaluate.
      */
-    if (checkProperties() || loadProperties()) {
+    MessageBytes storedHeader = request.getCoyoteRequest().getMimeHeaders().getValue(headerName);
+    if (storedHeader != null) {
+      log.warn("Header: " + storedHeader + " found before IP mapper eval!");
+      request.getCoyoteRequest().getMimeHeaders().removeHeader(headerName);
+    }
+
+    /**
+     * Get user IP. For now, we are assuming only IPV4.
+     */
+    String userIP = null;
+    String rawIP = request.getHeader("X-FORWARDED-FOR");
+    if (rawIP == null) {
+      userIP = request.getRemoteAddr();
+    } else {
       /**
-       * Check user headers for existing header. This is necessary to prevent
-       * spoofing. If the header already exists, strip and reevaluate.
+       * It's possible we might get a comma-separated list of IPs, in which
+       * case, we should split prior to evaluation. Real IP should always come
+       * first. This doesn't look pretty though.
        */
-      MessageBytes storedHeader = request.getCoyoteRequest().getMimeHeaders().getValue(headerName);
-      if (storedHeader != null) {
-        log.warn("Header: " + storedHeader + " found before IP mapper eval!");
-        request.getCoyoteRequest().getMimeHeaders().removeHeader(headerName);
+      String[] userIPs = rawIP.split(",");
+      if (userIPs[0] != null) {
+        userIP = userIPs[0].trim();
       }
+    }
+
+    if (userIP != null && isValidIP(userIP)) {
+      /**
+       * Compare user IP to properties IPs
+       */
+      List<String> approvals = getApprovals(userIP);
 
       /**
-       * Get user IP. For now, we are assuming only IPV4.
+       * Inject the header with value if the user's IP meets the above criteria.
        */
-      String userIP = null;
-      String rawIP = request.getHeader("X-FORWARDED-FOR");
-      if (rawIP == null) {
-        userIP = request.getRemoteAddr();
-      } else {
-        /**
-         * It's possible we might get a comma-separated list of IPs, in which
-         * case, we should split prior to evaluation. Real IP should always come
-         * first. This doesn't look pretty though.
-         */
-        String[] userIPs = rawIP.split(",");
-        if (userIPs[0] != null) {
-          userIP = userIPs[0].trim();
-        }
+      String finalHeaders = null;
+      if (!approvals.isEmpty()) {
+        finalHeaders = StringUtils.join(approvals, ",");
+        MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().setValue(headerName);
+        newHeader.setString(finalHeaders);
+        log.info("IP Mapper added: " + finalHeaders + " to header " + headerName + " for IP " + userIP);
       }
-
-      if (userIP != null && isValidIP(userIP)) {
-        /**
-         * Compare user IP to properties IPs
-         */
-        List<String> approvals = getApprovals(userIP);
-
-        /**
-         * Inject the header with value if the user's IP meets the above
-         * criteria.
-         */
-        String finalHeaders = null;
-        if (!approvals.isEmpty()) {
-          finalHeaders = StringUtils.join(approvals, ",");
-          MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().setValue(headerName);
-          newHeader.setString(finalHeaders);
-          log.info("IP Mapper added: " + finalHeaders + " to header " + headerName + " for IP " + userIP);
-        }
-      } // @end isValidIP
-    } // @end checkProperties || loadProperties
+    } // @end isValidIP
     getNext().invoke(request, response);
   }
 }

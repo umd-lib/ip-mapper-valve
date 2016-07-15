@@ -30,6 +30,7 @@ public class IPAddressMapperTest {
     mapper.setNext(invokedValve);
     mapper.setMappingFile(mappingFile);
     mapper.setHeaderName(headerName);
+    mapper.loadProperties();
   }
 
   public static class MockRequest extends Request {
