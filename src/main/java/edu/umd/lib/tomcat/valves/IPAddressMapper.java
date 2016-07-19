@@ -123,9 +123,13 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
       String property = properties.getProperty(key);
       String[] subnets = property.split(",");
       for (String subnet : subnets) {
-        utils = new SubnetUtils(subnet);
-        if (utils.getInfo().isInRange(ip)) {
-          approvals.add(key);
+        try {
+          utils = new SubnetUtils(subnet);
+          if (utils.getInfo().isInRange(ip)) {
+            approvals.add(key);
+          }
+        } catch (Exception e) {
+          log.warn(e.getMessage() + " CIDR notation required.");
         }
       }
     }
