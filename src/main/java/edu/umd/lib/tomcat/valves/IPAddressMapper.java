@@ -129,7 +129,13 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
             approvals.add(key);
           }
         } catch (Exception e) {
-          log.warn(e.getMessage() + " CIDR notation required.");
+          if (isValidIP(subnet)) {
+            if (subnet.equals(ip)) {
+              approvals.add(key);
+            }
+          } else {
+            log.warn("Invalid IP: " + e.getMessage());
+          }
         }
       }
     }
