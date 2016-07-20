@@ -123,18 +123,18 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
       String property = properties.getProperty(key);
       String[] subnets = property.split(",");
       for (String subnet : subnets) {
-        try {
-          utils = new SubnetUtils(subnet);
-          if (utils.getInfo().isInRange(ip)) {
+        if (isValidIP(subnet)) {
+          if (subnet.equals(ip)) {
             approvals.add(key);
           }
-        } catch (Exception e) {
-          if (isValidIP(subnet)) {
-            if (subnet.equals(ip)) {
+        } else {
+          try {
+            utils = new SubnetUtils(subnet);
+            if (utils.getInfo().isInRange(ip)) {
               approvals.add(key);
             }
-          } else {
-            log.warn("Invalid IP: " + e.getMessage());
+          } catch (Exception e) {
+            log.warn("Subnet Error: " + e.getMessage());
           }
         }
       }
