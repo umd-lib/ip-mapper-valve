@@ -57,7 +57,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
   protected void initInternal() throws LifecycleException {
     super.initInternal();
     if (checkProperties() || loadProperties()) {
-      log.warn("IPProperties: Not found");
+      log.warn("Properties: Not found");
     }
   }
 
@@ -112,7 +112,6 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
     Enumeration<?> propertyNames = properties.propertyNames();
 
     List<String> approvals = new ArrayList<String>();
-    SubnetUtils utils; // Our comparison library
 
     /**
      * Loop through properties. Check each IP block and compare with the user's
@@ -129,7 +128,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
           }
         } else {
           try {
-            utils = new SubnetUtils(subnet);
+            final SubnetUtils utils = new SubnetUtils(subnet);
             if (utils.getInfo().isInRange(ip)) {
               approvals.add(key);
             }
@@ -220,9 +219,8 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
       /**
        * Inject the header with value if the user's IP meets the above criteria.
        */
-      String finalHeaders = null;
       if (!approvals.isEmpty()) {
-        finalHeaders = StringUtils.join(approvals, ",");
+        final String finalHeaders = StringUtils.join(approvals, ",");
         MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().setValue(headerName);
         newHeader.setString(finalHeaders);
         log.info("IP Mapper added: " + finalHeaders + " to header " + headerName + " for IP " + userIP);
