@@ -30,25 +30,26 @@ import org.apache.tomcat.util.buf.MessageBytes;
  *
  * The properties file should follow the following format:
  *
- * header-name=0.0.0.0/32,0.0.0.0/16
+ * blockName=0.0.0.0/32,0.0.0.0/16
+ *
+ * The header value will be a comma-separated list of all of the blockNames
+ * where the user's IP address matched the block's IP address(es).
  *
  * The valve expects the following configuration format and options:
  *
  * &lt;Valve className="edu.umd.lib.tomcat.valves.IPAddressMapper"
  * mappingFile="path/to/mapping.properties" headerName="Some-Header" /&gt;
  *
- * Note the following parameters: mappingFile and headerName.
- *
  * @author jgottwig
  */
-
 public class IPAddressMapper extends ValveBase implements Lifecycle {
 
-  protected static final String info = "edu.umd.lib.tomcat.ipvalves.IPAddressMapper/0.0.1";
+  private static final String info = "edu.umd.lib.tomcat.valves.IPAddressMapper/1.0.0";
 
   private static final Log log = LogFactory.getLog(IPAddressMapper.class);
 
   private String mappingFile;
+
   private String headerName;
 
   private Properties properties = new Properties();
@@ -56,7 +57,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
   @Override
   protected void initInternal() throws LifecycleException {
     super.initInternal();
-    if (checkProperties() || loadProperties()) {
+    if (!(checkProperties() || loadProperties())) {
       log.warn("Properties: Not found");
     }
   }
@@ -77,7 +78,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    * Get the file name to be referenced for the IP blocks This will be a
    * properties file
    *
-   * @param mappingFile
+   * @param mappingFile name of the properties file
    */
   public void setMappingFile(String mappingFile) {
     this.mappingFile = mappingFile;
@@ -86,37 +87,36 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
   /**
    * Get the header name we want to check/set for access
    *
-   * @param headerName
+   * @param headerName name of the header
    */
   public void setHeaderName(String headerName) {
     this.headerName = headerName;
   }
 
   /**
-   * Check for valid IP
+   * Check for valid IP address
    *
-   * @param ip
+   * @param ip IP address to check
    * @return boolean (valid IP)
    */
-  protected boolean isValidIP(String ip) {
+  private boolean isValidIP(String ip) {
     return InetAddressValidator.getInstance().isValidInet4Address(ip);
   }
 
   /**
-   * Examine IP and compare against subnets from properties
+   * Examine IP and compare against subnets from properties.
    *
-   * @param ip
-   * @return List (approval strings)
+   * Check each IP block and compare with the user's
+   * IP.
+   *
+   * @param ip IP address to check
+   * @return List of block names that the user's IP address matches
    */
-  protected List<String> getApprovals(String ip) {
+  private List<String> getApprovals(String ip) {
     Enumeration<?> propertyNames = properties.propertyNames();
 
-    List<String> approvals = new ArrayList<String>();
+    List<String> approvals = new ArrayList<>();
 
-    /**
-     * Loop through properties. Check each IP block and compare with the user's
-     * IP. If a match, add to our approvals ArrayList.
-     */
     while (propertyNames.hasMoreElements()) {
       String key = (String) propertyNames.nextElement();
       String property = properties.getProperty(key);
@@ -147,7 +147,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    *
    * @return boolean (result of .hasMoreElements())
    */
-  protected boolean checkProperties() {
+  private boolean checkProperties() {
     Enumeration<?> propertyNames = properties.elements();
     return propertyNames.hasMoreElements();
   }
@@ -157,7 +157,7 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
    *
    * @return boolean (success)
    */
-  protected boolean loadProperties() {
+  boolean loadProperties() {
     boolean success = false;
     InputStream input = null;
     try {
@@ -178,47 +178,32 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
     return success;
   }
 
+  /**
+   * Check the user's IP address against the configured IP address blocks, and
+   * add the names of any matching block to the configured header. Remove any
+   * existing instances of that header, to prevent spoofing.
+   * Compare user IP to properties IPs
+   *
+   * @param request incoming request
+   * @param response outgoing response
+   */
   @Override
   public void invoke(Request request, Response response) throws IOException, ServletException {
 
-    /**
-     * Check user headers for existing header. This is necessary to prevent
-     * spoofing. If the header already exists, strip and reevaluate.
-     */
+    // Check user headers for existing header. This is necessary to prevent spoofing.
+    // If the header already exists, strip and reevaluate.
     MessageBytes storedHeader = request.getCoyoteRequest().getMimeHeaders().getValue(headerName);
     if (storedHeader != null) {
       log.warn("Header: " + storedHeader + " found before IP mapper eval!");
       request.getCoyoteRequest().getMimeHeaders().removeHeader(headerName);
     }
 
-    /**
-     * Get user IP. For now, we are assuming only IPV4.
-     */
-    String userIP = null;
-    String rawIP = request.getHeader("X-FORWARDED-FOR");
-    if (rawIP == null) {
-      userIP = request.getRemoteAddr();
-    } else {
-      /**
-       * It's possible we might get a comma-separated list of IPs, in which
-       * case, we should split prior to evaluation. Real IP should always come
-       * first. This doesn't look pretty though.
-       */
-      String[] userIPs = rawIP.split(",");
-      if (userIPs[0] != null) {
-        userIP = userIPs[0].trim();
-      }
-    }
+    String userIP = getUserIP(request);
 
     if (userIP != null && isValidIP(userIP)) {
-      /**
-       * Compare user IP to properties IPs
-       */
       List<String> approvals = getApprovals(userIP);
 
-      /**
-       * Inject the header with value if the user's IP meets the above criteria.
-       */
+      // Inject the header with value if the user's IP meets the above criteria.
       if (!approvals.isEmpty()) {
         final String finalHeaders = StringUtils.join(approvals, ",");
         MessageBytes newHeader = request.getCoyoteRequest().getMimeHeaders().setValue(headerName);
@@ -227,5 +212,29 @@ public class IPAddressMapper extends ValveBase implements Lifecycle {
       }
     } // @end isValidIP
     getNext().invoke(request, response);
+  }
+
+  /**
+   * Get the user's IP.
+   *
+   * For now, we are assuming only IPV4. It's possible we might get a
+   * comma-separated list of IPs, in which case, we should split prior to
+   * evaluation. Real IP should always come first.
+   *
+   * @param request incoming request
+   * @return the user's IP address, or null
+   */
+  private String getUserIP(Request request) {
+    String rawIP = request.getHeader("X-FORWARDED-FOR");
+    if (rawIP == null) {
+      return request.getRemoteAddr();
+    } else {
+      String[] userIPs = rawIP.split(",");
+      if (userIPs[0] != null) {
+        return userIPs[0].trim();
+      } else {
+        return null;
+      }
+    }
   }
 }
